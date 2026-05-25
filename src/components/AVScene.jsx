@@ -12,10 +12,10 @@ const SENSOR_COLORS = {
 
 const laneMarkings = [-1.8, 1.8];
 
-export function AVScene({ activeSensors, fusionView, selectedObject }) {
+export function AVScene({ activeSensors, fusionView, selectedObject, selectedScenario }) {
   return (
     <group>
-      <RoadEnvironment />
+      <RoadEnvironment selectedScenario={selectedScenario} />
       <EgoVehicle />
       <SceneObjects selectedObject={selectedObject} activeSensors={activeSensors} />
       {fusionView ? (
@@ -30,32 +30,33 @@ export function AVScene({ activeSensors, fusionView, selectedObject }) {
   );
 }
 
-function RoadEnvironment() {
+function RoadEnvironment({ selectedScenario }) {
   return (
     <group>
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.04, 0]}>
-        <planeGeometry args={[18, 28]} />
+        <planeGeometry args={[20, 34]} />
         <meshStandardMaterial color="#d8ded6" roughness={0.86} />
       </mesh>
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-        <planeGeometry args={[7.4, 25]} />
+        <planeGeometry args={[7.4, 31]} />
         <meshStandardMaterial color="#30343b" roughness={0.82} />
       </mesh>
       {[-3.9, 3.9].map((x) => (
         <mesh key={x} receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[x, 0.015, 0]}>
-          <planeGeometry args={[0.16, 25]} />
+          <planeGeometry args={[0.16, 31]} />
           <meshStandardMaterial color="#f5f7f2" roughness={0.7} />
         </mesh>
       ))}
       {laneMarkings.map((x) =>
-        Array.from({ length: 7 }, (_, index) => (
-          <mesh key={`${x}-${index}`} rotation={[-Math.PI / 2, 0, 0]} position={[x, 0.025, -10 + index * 3.7]}>
+        Array.from({ length: 9 }, (_, index) => (
+          <mesh key={`${x}-${index}`} rotation={[-Math.PI / 2, 0, 0]} position={[x, 0.025, -13.4 + index * 3.55]}>
             <planeGeometry args={[0.08, 1.55]} />
             <meshStandardMaterial color="#f8fafc" roughness={0.45} />
           </mesh>
         )),
       )}
       <Crosswalk />
+      {selectedScenario === 'highway-underpass' && <HighwayUnderpass />}
       <SidewalkDetails />
     </group>
   );
@@ -81,6 +82,64 @@ function SidewalkDetails() {
       <TrafficCone position={[4.7, 0.05, -1.5]} />
       <TrafficSign position={[4.9, 0, -7.8]} />
       <TrafficLight position={[-4.6, 0, -7.2]} />
+    </group>
+  );
+}
+
+function HighwayUnderpass() {
+  return (
+    <group position={[0, 0, -11.25]}>
+      <mesh receiveShadow position={[0, 2.55, 0]}>
+        <boxGeometry args={[11.6, 0.42, 3.8]} />
+        <meshStandardMaterial color="#7f8b94" roughness={0.76} metalness={0.04} />
+      </mesh>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, Math.PI / 2]} position={[0, 2.785, 0]}>
+        <planeGeometry args={[3.08, 11.05]} />
+        <meshStandardMaterial color="#2f343b" roughness={0.82} />
+      </mesh>
+      {[-5.75, 5.75].map((x) => (
+        <mesh key={`guard-${x}`} castShadow position={[x, 3.03, 0]}>
+          <boxGeometry args={[0.18, 0.5, 3.95]} />
+          <meshStandardMaterial color="#c7cdd1" roughness={0.55} />
+        </mesh>
+      ))}
+      {[-1.15, 1.15].map((z) =>
+        Array.from({ length: 8 }, (_, index) => (
+          <mesh
+            key={`top-lane-${z}-${index}`}
+            rotation={[-Math.PI / 2, 0, Math.PI / 2]}
+            position={[-4.5 + index * 1.28, 2.805, z]}
+          >
+            <planeGeometry args={[0.08, 0.72]} />
+            <meshStandardMaterial color="#f8fafc" roughness={0.48} />
+          </mesh>
+        )),
+      )}
+      <mesh rotation={[-Math.PI / 2, 0, Math.PI / 2]} position={[2.9, 2.81, 0]}>
+        <planeGeometry args={[0.12, 1.1]} />
+        <meshStandardMaterial color="#f8fafc" roughness={0.45} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, -Math.PI / 2]} position={[3.52, 2.81, 0]}>
+        <coneGeometry args={[0.32, 0.58, 3]} />
+        <meshStandardMaterial color="#f8fafc" roughness={0.45} />
+      </mesh>
+      {[-4.65, 4.65].map((x) =>
+        [-1.38, 1.38].map((z) => (
+          <mesh key={`pier-${x}-${z}`} castShadow receiveShadow position={[x, 1.25, z]}>
+            <boxGeometry args={[0.58, 2.5, 0.58]} />
+            <meshStandardMaterial color="#9ba5aa" roughness={0.82} />
+          </mesh>
+        )),
+      )}
+      {[-2.1, 2.1].map((x) => (
+        <mesh key={`shadow-${x}`} rotation={[-Math.PI / 2, 0, 0]} position={[x, 0.035, 0]}>
+          <planeGeometry args={[1.7, 3.7]} />
+          <meshBasicMaterial color="#101827" transparent opacity={0.18} depthWrite={false} />
+        </mesh>
+      ))}
+      <Html position={[0, 3.24, -1.95]} center distanceFactor={12}>
+        <div className="scenario-label">Highway underpass</div>
+      </Html>
     </group>
   );
 }
@@ -264,7 +323,7 @@ function TrafficLight({ position }) {
         <meshStandardMaterial color="#111827" />
       </mesh>
       {['#ef4444', '#f59e0b', '#22c55e'].map((color, index) => (
-        <mesh key={color} position={[0.26, 2.42 - index * 0.24, -0.12]}>
+        <mesh key={color} position={[0.26, 2.42 - index * 0.24, 0.12]}>
           <sphereGeometry args={[0.065, 16, 12]} />
           <meshStandardMaterial color={color} emissive={color} emissiveIntensity={index === 2 ? 0.75 : 0.2} />
         </mesh>

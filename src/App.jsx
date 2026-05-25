@@ -9,7 +9,10 @@ import {
   CircleDot,
   Gauge,
   Layers3,
+  PanelRightClose,
+  PanelRightOpen,
   Radar,
+  Route,
   RotateCcw,
   Satellite,
   ShieldAlert,
@@ -115,6 +118,17 @@ const FUSION_TRACKS = [
   },
 ];
 
+const SCENARIOS = [
+  {
+    id: 'highway-underpass',
+    label: 'Highway underpass',
+    icon: Route,
+    factor: 'Grade-separated roadway',
+    summary: 'The ego AV approaches an underpass where overhead road geometry can create occlusion, shadow, and localization cues.',
+    conditions: ['Overhead one-way road', 'Lane markings', 'No traffic on top'],
+  },
+];
+
 function App() {
   const [activeSensors, setActiveSensors] = useState({
     camera: true,
@@ -125,6 +139,9 @@ function App() {
   const [fusionView, setFusionView] = useState(false);
   const [selectedObject, setSelectedObject] = useState('Lead car');
   const [emptyBannerDismissed, setEmptyBannerDismissed] = useState(false);
+  const [activePanelTab, setActivePanelTab] = useState('sensors');
+  const [panelCollapsed, setPanelCollapsed] = useState(false);
+  const [selectedScenario, setSelectedScenario] = useState('highway-underpass');
 
   const enabledSensors = useMemo(
     () => Object.entries(activeSensors).filter(([, enabled]) => enabled).map(([key]) => key),
@@ -132,6 +149,8 @@ function App() {
   );
 
   const selectedObjectData = OBJECTS.find((item) => item.label === selectedObject) ?? OBJECTS[0];
+  const selectedScenarioData = SCENARIOS.find((item) => item.id === selectedScenario) ?? SCENARIOS[0];
+  const scenarioEnabled = Boolean(selectedScenario);
   const showEmptyBanner = enabledSensors.length === 0 && !fusionView && !emptyBannerDismissed;
 
   function toggleSensor(sensor) {
@@ -159,7 +178,7 @@ function App() {
   }
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell ${panelCollapsed ? 'panel-collapsed' : ''}`}>
       <section className="scene-region" aria-label="Interactive autonomous vehicle sensor scene">
         <div className="scene-topbar">
           <div>
@@ -208,7 +227,12 @@ function App() {
             shadow-mapSize-height={2048}
           />
           <Suspense fallback={null}>
-            <AVScene activeSensors={activeSensors} fusionView={fusionView} selectedObject={selectedObject} />
+            <AVScene
+              activeSensors={activeSensors}
+              fusionView={fusionView}
+              selectedObject={selectedObject}
+              selectedScenario={selectedScenario}
+            />
             <Environment preset="city" />
           </Suspense>
           <OrbitControls
@@ -236,189 +260,291 @@ function App() {
         </div>
       </section>
 
-      <aside className="control-panel">
-        <div className="panel-section">
-          <div className="section-title">
-            <span>Sensor Stack</span>
-            <span>{fusionView ? 'Fusion mode' : `${enabledSensors.length}/4 active`}</span>
-          </div>
-          {fusionView && (
-            <div className="fusion-mode-card">
-              <Satellite size={19} />
-              <span>
-                <strong>Fused perception</strong>
-                <small>Combines all active sensor evidence into tracked objects, object confidence, and path risk.</small>
-              </span>
-            </div>
-          )}
-          <div className="sensor-list">
-            {Object.entries(SENSOR_CONFIG).map(([key, sensor]) => {
-              const Icon = sensor.icon;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  className={`sensor-toggle ${activeSensors[key] ? 'enabled' : ''}`}
-                  onClick={() => toggleSensor(key)}
-                  style={{ '--sensor-color': sensor.color }}
-                >
-                  <Icon size={20} />
-                  <span>
-                    <strong>{sensor.label}</strong>
-                    <small>{sensor.range}</small>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+      <aside className="control-panel" aria-label="Visualization controls">
+        <button
+          type="button"
+          className="panel-collapse-button"
+          aria-label={panelCollapsed ? 'Expand control panel' : 'Collapse control panel'}
+          onClick={() => setPanelCollapsed((collapsed) => !collapsed)}
+        >
+          {panelCollapsed ? <PanelRightOpen size={18} /> : <PanelRightClose size={18} />}
+        </button>
 
-        <div className="panel-section">
-          <div className="section-title">
-            <span>{fusionView ? 'Fusion Interpretation' : 'What Active Sensors See'}</span>
-            <span>
-              {fusionView
-                ? `${FUSION_TRACKS.length} tracks`
-                : enabledSensors.length === 0
-                  ? 'No readout'
-                  : `${enabledSensors.length} layer${enabledSensors.length > 1 ? 's' : ''}`}
-            </span>
-          </div>
-          {fusionView ? (
-            <div className="fusion-track-list">
-              {FUSION_TRACKS.map((track) => (
-                <article key={track.label} className={`fusion-track risk-${track.risk.toLowerCase()}`}>
-                  <div className="fusion-track-head">
-                    <Gauge size={18} />
-                    <span>
-                      <strong>{track.label}</strong>
-                      <small>{track.confidence} object confidence</small>
-                    </span>
-                    <em>{track.risk}</em>
-                  </div>
-                  <p>{track.summary}</p>
-                  <div className="readout-chips">
-                    {track.sources.map((source) => (
-                      <span key={source}>{source}</span>
-                    ))}
-                  </div>
-                </article>
-              ))}
-              <article className="fusion-path-card">
-                <strong>Path risk overlay</strong>
-                <p>Yellow is the ego AV's planned path corridor. Red marks the part of that path with elevated conflict risk based on fused tracks nearby.</p>
-                <div className="path-key">
-                  <span className="planned">Planned path</span>
-                  <span className="risk">Conflict risk</span>
-                </div>
-              </article>
+        {!panelCollapsed && (
+          <>
+            <div className="panel-tabs" role="tablist" aria-label="Control panel sections">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activePanelTab === 'sensors'}
+                className={activePanelTab === 'sensors' ? 'active' : ''}
+                onClick={() => setActivePanelTab('sensors')}
+              >
+                <Layers3 size={17} />
+                Sensor Stack
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activePanelTab === 'scenarios'}
+                className={activePanelTab === 'scenarios' ? 'active' : ''}
+                onClick={() => setActivePanelTab('scenarios')}
+              >
+                <Route size={17} />
+                Scenarios
+              </button>
             </div>
-          ) : (
-            <div className="readout-list">
-              {Object.entries(SENSOR_OBSERVATIONS).map(([key, observation]) => {
-                const sensor = SENSOR_CONFIG[key];
-                const Icon = sensor.icon;
-                const enabled = activeSensors[key];
-                return (
-                  <article
-                    key={key}
-                    className={`readout-card ${enabled ? 'enabled' : ''}`}
-                    style={{ '--sensor-color': sensor.color }}
-                  >
-                    <div className="readout-heading">
-                      <Icon size={18} />
+
+            {activePanelTab === 'sensors' ? (
+              <div role="tabpanel" aria-label="Sensor Stack">
+                <div className="panel-section">
+                  <div className="section-title">
+                    <span>Sensor Stack</span>
+                    <span>{fusionView ? 'Fusion mode' : `${enabledSensors.length}/4 active`}</span>
+                  </div>
+                  {fusionView && (
+                    <div className="fusion-mode-card">
+                      <Satellite size={19} />
                       <span>
-                        <strong>{sensor.label}</strong>
-                        <small>{observation.title}</small>
+                        <strong>Fused perception</strong>
+                        <small>Combines all active sensor evidence into tracked objects, object confidence, and path risk.</small>
                       </span>
                     </div>
-                    <p>{enabled ? observation.summary : `Toggle ${sensor.label} to show this layer in the scene.`}</p>
-                    <div className="readout-chips">
-                      {observation.detects.map((item) => (
-                        <span key={item}>{item}</span>
+                  )}
+                  <div className="sensor-list">
+                    {Object.entries(SENSOR_CONFIG).map(([key, sensor]) => {
+                      const Icon = sensor.icon;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          className={`sensor-toggle ${activeSensors[key] ? 'enabled' : ''}`}
+                          onClick={() => toggleSensor(key)}
+                          style={{ '--sensor-color': sensor.color }}
+                        >
+                          <Icon size={20} />
+                          <span>
+                            <strong>{sensor.label}</strong>
+                            <small>{sensor.range}</small>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="panel-section">
+                  <div className="section-title">
+                    <span>{fusionView ? 'Fusion Interpretation' : 'What Active Sensors See'}</span>
+                    <span>
+                      {fusionView
+                        ? `${FUSION_TRACKS.length} tracks`
+                        : enabledSensors.length === 0
+                          ? 'No readout'
+                          : `${enabledSensors.length} layer${enabledSensors.length > 1 ? 's' : ''}`}
+                    </span>
+                  </div>
+                  {fusionView ? (
+                    <div className="fusion-track-list">
+                      {FUSION_TRACKS.map((track) => (
+                        <article key={track.label} className={`fusion-track risk-${track.risk.toLowerCase()}`}>
+                          <div className="fusion-track-head">
+                            <Gauge size={18} />
+                            <span>
+                              <strong>{track.label}</strong>
+                              <small>{track.confidence} object confidence</small>
+                            </span>
+                            <em>{track.risk}</em>
+                          </div>
+                          <p>{track.summary}</p>
+                          <div className="readout-chips">
+                            {track.sources.map((source) => (
+                              <span key={source}>{source}</span>
+                            ))}
+                          </div>
+                        </article>
                       ))}
+                      <article className="fusion-path-card">
+                        <strong>Path risk overlay</strong>
+                        <p>Yellow is the ego AV's planned path corridor. Red marks the part of that path with elevated conflict risk based on fused tracks nearby.</p>
+                        <div className="path-key">
+                          <span className="planned">Planned path</span>
+                          <span className="risk">Conflict risk</span>
+                        </div>
+                      </article>
+                    </div>
+                  ) : (
+                    <div className="readout-list">
+                      {Object.entries(SENSOR_OBSERVATIONS).map(([key, observation]) => {
+                        const sensor = SENSOR_CONFIG[key];
+                        const Icon = sensor.icon;
+                        const enabled = activeSensors[key];
+                        return (
+                          <article
+                            key={key}
+                            className={`readout-card ${enabled ? 'enabled' : ''}`}
+                            style={{ '--sensor-color': sensor.color }}
+                          >
+                            <div className="readout-heading">
+                              <Icon size={18} />
+                              <span>
+                                <strong>{sensor.label}</strong>
+                                <small>{observation.title}</small>
+                              </span>
+                            </div>
+                            <p>{enabled ? observation.summary : `Toggle ${sensor.label} to show this layer in the scene.`}</p>
+                            <div className="readout-chips">
+                              {observation.detects.map((item) => (
+                                <span key={item}>{item}</span>
+                              ))}
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="panel-section">
+                  <div className="section-title">
+                    <span>Object Inspector</span>
+                    <span>{selectedObjectData.type}</span>
+                  </div>
+                  <div className="object-grid">
+                    {OBJECTS.map((object) => {
+                      const Icon = object.icon;
+                      return (
+                        <button
+                          type="button"
+                          key={object.label}
+                          className={object.label === selectedObject ? 'selected' : ''}
+                          onClick={() => setSelectedObject(object.label)}
+                        >
+                          <Icon size={18} />
+                          <span>{object.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={`${selectedObjectData.label}-${enabledSensors.join('-')}`}
+                      className="object-detail"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={{ duration: 0.18 }}
+                    >
+                      <h2>{selectedObjectData.label}</h2>
+                      <p>{selectedObjectData.position}</p>
+                      {fusionView && (
+                        <div className="fusion-object-note">
+                          <ShieldAlert size={15} />
+                          <span>
+                            {FUSION_TRACKS.find((track) => track.label === selectedObjectData.label)?.risk ?? 'Low'} risk after sensor fusion
+                          </span>
+                        </div>
+                      )}
+                      <div className="seen-by">
+                        {selectedObjectData.seenBy.map((sensor) => {
+                          const enabled = activeSensors[sensor];
+                          return (
+                            <span
+                              key={sensor}
+                              className={enabled ? 'enabled' : ''}
+                              style={{ '--sensor-color': SENSOR_CONFIG[sensor].color }}
+                            >
+                              {SENSOR_CONFIG[sensor].label}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+
+                <div className="panel-section">
+                  <div className="section-title">
+                    <span>Sensor Notes</span>
+                    <span>{fusionView ? 'Fusion view' : 'Single layers'}</span>
+                  </div>
+                  <div className="notes-list">
+                    {Object.entries(SENSOR_CONFIG).map(([key, sensor]) => (
+                      <article key={key} className={activeSensors[key] ? 'active' : ''}>
+                        <strong style={{ '--sensor-color': sensor.color }}>{sensor.label}</strong>
+                        <p>{sensor.strength}</p>
+                        <small>{sensor.limitation}</small>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div role="tabpanel" aria-label="Scenarios">
+                <div className="panel-section">
+                  <div className="section-title">
+                    <span>Scenarios</span>
+                    <span>{SCENARIOS.length} simulations</span>
+                  </div>
+                  <div className="scenario-list">
+                    {SCENARIOS.map((scenario) => {
+                      const Icon = scenario.icon;
+                      const selected = selectedScenario === scenario.id;
+                      return (
+                        <button
+                          key={scenario.id}
+                          type="button"
+                          className={`scenario-card ${selected ? 'selected' : ''}`}
+                          onClick={() => setSelectedScenario((current) => (current === scenario.id ? null : scenario.id))}
+                        >
+                          <span className="scenario-icon">
+                            <Icon size={20} />
+                          </span>
+                          <span className="scenario-copy">
+                            <span className="scenario-card-head">
+                              <strong>{scenario.label}</strong>
+                              <em>{selected ? 'Enabled' : 'Off'}</em>
+                            </span>
+                            <small>{scenario.factor}</small>
+                            <p>{scenario.summary}</p>
+                            <span className="scenario-tags">
+                              {scenario.conditions.map((condition) => (
+                                <em key={condition}>{condition}</em>
+                              ))}
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="panel-section">
+                  <div className="section-title">
+                    <span>Active Scenario</span>
+                    <span>{scenarioEnabled ? selectedScenarioData.factor : 'Disabled'}</span>
+                  </div>
+                  <article className={`scenario-detail ${scenarioEnabled ? 'enabled' : ''}`}>
+                    <strong>{scenarioEnabled ? selectedScenarioData.label : 'No scenario enabled'}</strong>
+                    <p>
+                      {scenarioEnabled
+                        ? selectedScenarioData.summary
+                        : 'Enable Highway underpass to add the elevated one-way road back into the scene.'}
+                    </p>
+                    <div className="readout-chips">
+                      {scenarioEnabled ? (
+                        selectedScenarioData.conditions.map((condition) => <span key={condition}>{condition}</span>)
+                      ) : (
+                        <span>Scenario hidden</span>
+                      )}
                     </div>
                   </article>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div className="panel-section">
-          <div className="section-title">
-            <span>Object Inspector</span>
-            <span>{selectedObjectData.type}</span>
-          </div>
-          <div className="object-grid">
-            {OBJECTS.map((object) => {
-              const Icon = object.icon;
-              return (
-                <button
-                  type="button"
-                  key={object.label}
-                  className={object.label === selectedObject ? 'selected' : ''}
-                  onClick={() => setSelectedObject(object.label)}
-                >
-                  <Icon size={18} />
-                  <span>{object.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={`${selectedObjectData.label}-${enabledSensors.join('-')}`}
-              className="object-detail"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.18 }}
-            >
-              <h2>{selectedObjectData.label}</h2>
-              <p>{selectedObjectData.position}</p>
-              {fusionView && (
-                <div className="fusion-object-note">
-                  <ShieldAlert size={15} />
-                  <span>
-                    {FUSION_TRACKS.find((track) => track.label === selectedObjectData.label)?.risk ?? 'Low'} risk after sensor fusion
-                  </span>
                 </div>
-              )}
-              <div className="seen-by">
-                {selectedObjectData.seenBy.map((sensor) => {
-                  const enabled = activeSensors[sensor];
-                  return (
-                    <span
-                      key={sensor}
-                      className={enabled ? 'enabled' : ''}
-                      style={{ '--sensor-color': SENSOR_CONFIG[sensor].color }}
-                    >
-                      {SENSOR_CONFIG[sensor].label}
-                    </span>
-                  );
-                })}
               </div>
-            </motion.div>
-          </AnimatePresence>
-        </div>
-
-        <div className="panel-section">
-          <div className="section-title">
-            <span>Sensor Notes</span>
-            <span>{fusionView ? 'Fusion view' : 'Single layers'}</span>
-          </div>
-          <div className="notes-list">
-            {Object.entries(SENSOR_CONFIG).map(([key, sensor]) => (
-              <article key={key} className={activeSensors[key] ? 'active' : ''}>
-                <strong style={{ '--sensor-color': sensor.color }}>{sensor.label}</strong>
-                <p>{sensor.strength}</p>
-                <small>{sensor.limitation}</small>
-              </article>
-            ))}
-          </div>
-        </div>
+            )}
+          </>
+        )}
       </aside>
     </main>
   );
