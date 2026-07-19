@@ -40,6 +40,22 @@ button {
   grid-template-columns: minmax(0, 1fr) 58px;
 }
 
+.app-shell.night-mode {
+  background:
+    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+    #0f172a;
+  background-size: 32px 32px;
+}
+
+.app-shell.snow-mode:not(.night-mode) {
+  background:
+    linear-gradient(90deg, rgba(71, 85, 105, 0.05) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(71, 85, 105, 0.05) 1px, transparent 1px),
+    #e3ebef;
+  background-size: 32px 32px;
+}
+
 .scene-region {
   position: relative;
   min-width: 0;
@@ -79,6 +95,11 @@ h1 {
   line-height: 0.94;
   letter-spacing: 0;
   max-width: 620px;
+}
+
+.night-mode h1 {
+  color: #f8fafc;
+  text-shadow: 0 10px 28px rgba(0, 0, 0, 0.32);
 }
 
 .view-actions {
@@ -121,6 +142,17 @@ h1 {
 .view-actions button.active {
   background: #172033;
   color: #ffffff;
+}
+
+.night-mode .view-actions button {
+  border-color: rgba(203, 213, 225, 0.24);
+  background: rgba(15, 23, 42, 0.74);
+  color: #f8fafc;
+}
+
+.night-mode .view-actions button.active {
+  background: #f8fafc;
+  color: #172033;
 }
 
 .empty-state-banner {
@@ -190,6 +222,12 @@ h1 {
   font-weight: 750;
   box-shadow: 0 10px 30px rgba(23, 32, 51, 0.08);
   backdrop-filter: blur(12px);
+}
+
+.night-mode .scene-legend span {
+  border: 1px solid rgba(203, 213, 225, 0.2);
+  background: rgba(15, 23, 42, 0.82);
+  color: #f8fafc;
 }
 
 .scene-legend span::before {
@@ -493,6 +531,32 @@ h1 {
   gap: 10px;
 }
 
+.fusion-scenario-card {
+  padding: 12px;
+  border: 1px solid rgba(14, 165, 233, 0.18);
+  border-radius: 8px;
+  background: #eff6ff;
+  box-shadow: inset 4px 0 0 #0ea5e9;
+}
+
+.fusion-scenario-card strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #0f172a;
+  font-size: 0.86rem;
+}
+
+.fusion-scenario-card p {
+  margin: 0;
+  color: #334155;
+  font-size: 0.8rem;
+  line-height: 1.38;
+}
+
+.fusion-scenario-card p + p {
+  margin-top: 6px;
+}
+
 .fusion-track {
   padding: 12px;
   border: 1px solid rgba(23, 32, 51, 0.08);
@@ -771,6 +835,11 @@ h1 {
   box-shadow: inset 4px 0 0 #172033;
 }
 
+.scenario-card.selected .scenario-icon {
+  background: #172033;
+  color: #ffffff;
+}
+
 .scenario-icon {
   display: flex;
   align-items: center;
@@ -872,6 +941,55 @@ h1 {
   font-size: 1rem;
 }
 
+.impact-list {
+  display: grid;
+  gap: 10px;
+}
+
+.impact-list article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 10px;
+  padding: 12px;
+  border: 1px solid rgba(23, 32, 51, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 4px 0 0 color-mix(in srgb, var(--sensor-color) 42%, #cbd5e1);
+  opacity: 0.72;
+}
+
+.impact-list article.active {
+  background: #ffffff;
+  opacity: 1;
+}
+
+.impact-list strong {
+  color: var(--sensor-color);
+  font-size: 0.86rem;
+}
+
+.impact-list em {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sensor-color) 13%, #ffffff);
+  color: #334155;
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.impact-list p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #334155;
+  font-size: 0.8rem;
+  line-height: 1.38;
+}
+
+.impact-list p + p {
+  margin-top: 5px;
+}
+
 .object-label,
 .detection-tag,
 .velocity-tag,
@@ -949,6 +1067,18 @@ h1 {
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 8px 22px rgba(23, 32, 51, 0.16);
   font-size: 11px;
+}
+
+.scenario-label.night {
+  border: 1px solid rgba(191, 219, 254, 0.55);
+  background: rgba(15, 23, 42, 0.88);
+  color: #dbeafe;
+}
+
+.scenario-label.snow {
+  border: 1px solid rgba(148, 163, 184, 0.36);
+  background: rgba(248, 250, 252, 0.94);
+  color: #334155;
 }
 
 @media (max-width: 960px) {
