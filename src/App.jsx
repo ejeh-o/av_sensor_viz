@@ -1,6 +1,7 @@
-import React, { Suspense, useMemo, useState } from 'react';
-import { Canvas } from '@react-three/fiber';
+import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { Environment, OrbitControls, PerspectiveCamera } from '@react-three/drei';
+import * as THREE from 'three';
 import {
   Activity,
   Bike,
@@ -9,6 +10,7 @@ import {
   CircleDot,
   Gauge,
   Layers3,
+  Map,
   Moon,
   PanelRightClose,
   PanelRightOpen,
@@ -331,6 +333,47 @@ const SCENARIOS = [
   },
 ];
 
+function CameraViewTransition({ bevView, controlsRef, onTransitionChange }) {
+  const transitionRef = useRef(false);
+  const targetPositionRef = useRef(new THREE.Vector3(8.5, 8, 10.5));
+  const targetLookAtRef = useRef(new THREE.Vector3(0, 0, 0));
+
+  useEffect(() => {
+    targetPositionRef.current.set(...(bevView ? [0, 17.5, 0.3] : [8.5, 8, 10.5]));
+    targetLookAtRef.current.set(...(bevView ? [0, 0, -3.75] : [0, 0, 0]));
+    transitionRef.current = true;
+    onTransitionChange(true);
+  }, [bevView, onTransitionChange]);
+
+  useFrame(({ camera }, delta) => {
+    if (!transitionRef.current) return;
+
+    const smoothing = 1 - Math.exp(-6.5 * delta);
+    const controls = controlsRef.current;
+    camera.position.lerp(targetPositionRef.current, smoothing);
+
+    if (controls) {
+      controls.target.lerp(targetLookAtRef.current, smoothing);
+      controls.update();
+    } else {
+      camera.lookAt(targetLookAtRef.current);
+    }
+
+    if (
+      camera.position.distanceTo(targetPositionRef.current) < 0.015
+      && (!controls || controls.target.distanceTo(targetLookAtRef.current) < 0.015)
+    ) {
+      camera.position.copy(targetPositionRef.current);
+      controls?.target.copy(targetLookAtRef.current);
+      controls?.update();
+      transitionRef.current = false;
+      onTransitionChange(false);
+    }
+  }, -1);
+
+  return null;
+}
+
 function App() {
   const [activeSensors, setActiveSensors] = useState({
     camera: true,
@@ -344,6 +387,9 @@ function App() {
   const [activePanelTab, setActivePanelTab] = useState('sensors');
   const [panelCollapsed, setPanelCollapsed] = useState(false);
   const [activeScenarios, setActiveScenarios] = useState(['highway-underpass']);
+  const [bevView, setBevView] = useState(false);
+  const [cameraTransitioning, setCameraTransitioning] = useState(false);
+  const orbitControlsRef = useRef();
 
   const enabledSensors = useMemo(
     () => Object.entries(activeSensors).filter(([, enabled]) => enabled).map(([key]) => key),
@@ -416,6 +462,7 @@ function App() {
     setActiveSensors({ camera: false, lidar: false, radar: false, ultrasonic: false });
     setFusionView(false);
     setSelectedObject('Lead car');
+    setBevView(false);
     setEmptyBannerDismissed(false);
   }
 
@@ -433,6 +480,15 @@ function App() {
             <h1>AV Sensor Visualization</h1>
           </div>
           <div className="view-actions">
+            <button
+              type="button"
+              className={bevView ? 'active' : ''}
+              aria-pressed={bevView}
+              onClick={() => setBevView((enabled) => !enabled)}
+            >
+              <Map size={18} />
+              BEV
+            </button>
             <button type="button" onClick={enableAll}>
               <Layers3 size={18} />
               All sensors
@@ -466,6 +522,7 @@ function App() {
 
         <Canvas shadows dpr={[1, 2]} gl={{ antialias: true }}>
           <PerspectiveCamera makeDefault position={[8.5, 8, 10.5]} fov={46} />
+          <CameraViewTransition bevView={bevView} controlsRef={orbitControlsRef} onTransitionChange={setCameraTransitioning} />
           <color attach="background" args={[nightModeEnabled ? '#101827' : snowEnabled ? '#dce4eb' : '#f6f8f3']} />
           <fog
             attach="fog"
@@ -491,15 +548,19 @@ function App() {
               activeScenarios={activeScenarios}
               fusionTracks={fusionTracks}
               snowEnabled={snowEnabled}
+              bevView={bevView}
             />
             {!nightModeEnabled && <Environment preset="city" />}
           </Suspense>
           <OrbitControls
+            ref={orbitControlsRef}
             makeDefault
             enablePan={false}
-            minDistance={7}
-            maxDistance={18}
-            minPolarAngle={0.45}
+            enabled={!cameraTransitioning}
+            enableRotate={!bevView && !cameraTransitioning}
+            minDistance={bevView ? 12 : 7}
+            maxDistance={26}
+            minPolarAngle={bevView || cameraTransitioning ? 0 : 0.45}
             maxPolarAngle={1.24}
           />
         </Canvas>

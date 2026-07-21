@@ -75,7 +75,7 @@ function getFusionLabel(label, fusionTracks) {
   };
 }
 
-export function AVScene({ activeSensors, fusionView, selectedObject, activeScenarios, fusionTracks, snowEnabled }) {
+export function AVScene({ activeSensors, fusionView, selectedObject, activeScenarios, fusionTracks, snowEnabled, bevView }) {
   const nightModeEnabled = activeScenarios.includes('night-mode');
   return (
     <group>
@@ -87,7 +87,7 @@ export function AVScene({ activeSensors, fusionView, selectedObject, activeScena
       ) : (
         <>
           {activeSensors.lidar && <LidarObjectOutlines fusionView={fusionView} />}
-          <SensorLayers activeSensors={activeSensors} fusionView={fusionView} />
+          <SensorLayers activeSensors={activeSensors} fusionView={fusionView} bevView={bevView} />
         </>
       )}
     </group>
@@ -216,7 +216,7 @@ function NightLighting() {
       <hemisphereLight args={['#7dd3fc', '#0f172a', 0.18]} />
       <pointLight position={[-4.55, 3.1, -7.2]} intensity={1.45} distance={7.5} color="#fef3c7" />
       <pointLight position={[4.6, 3.4, -1.5]} intensity={0.62} distance={6.5} color="#bfdbfe" />
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.041, -3.35]}>
+      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0.041, -3.35]}>
         <coneGeometry args={[3.35, 8.6, 48, 1, true]} />
         <meshBasicMaterial color="#fef3c7" transparent opacity={0.13} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
@@ -458,21 +458,21 @@ function ObjectLabel({ label, position }) {
   );
 }
 
-function SensorLayers({ activeSensors, fusionView }) {
+function SensorLayers({ activeSensors, fusionView, bevView }) {
   return (
     <group position={[0, 0.06, 2.7]}>
-      {activeSensors.camera && <CameraFrustum fusionView={fusionView} />}
-      {activeSensors.lidar && <LidarCloud fusionView={fusionView} />}
-      {activeSensors.radar && <RadarArcs fusionView={fusionView} />}
-      {activeSensors.ultrasonic && <UltrasonicBubbles fusionView={fusionView} />}
+      {activeSensors.camera && <CameraFrustum fusionView={fusionView} bevView={bevView} />}
+      {activeSensors.lidar && <LidarCloud fusionView={fusionView} bevView={bevView} />}
+      {activeSensors.radar && <RadarArcs fusionView={fusionView} bevView={bevView} />}
+      {activeSensors.ultrasonic && <UltrasonicBubbles fusionView={fusionView} bevView={bevView} />}
     </group>
   );
 }
 
-function CameraFrustum({ fusionView }) {
+function CameraFrustum({ fusionView, bevView }) {
   const materialRef = useRef();
   useFrame(({ clock }) => {
-    if (materialRef.current) materialRef.current.opacity = fusionView ? 0.23 + Math.sin(clock.elapsedTime * 2.5) * 0.04 : 0.2;
+    if (materialRef.current) materialRef.current.opacity = fusionView ? 0.23 + Math.sin(clock.elapsedTime * 2.5) * 0.04 : bevView ? 0.28 : 0.2;
   });
   return (
     <group>
@@ -603,7 +603,7 @@ function FusionTrack({ position, scale, label, confidence, risk, color }) {
   );
 }
 
-function LidarCloud({ fusionView }) {
+function LidarCloud({ fusionView, bevView }) {
   const pointsRef = useRef();
   const { positions, colors } = useMemo(() => {
     const count = 900;
@@ -634,12 +634,12 @@ function LidarCloud({ fusionView }) {
         <bufferAttribute attach="attributes-position" count={positions.length / 3} array={positions} itemSize={3} />
         <bufferAttribute attach="attributes-color" count={colors.length / 3} array={colors} itemSize={3} />
       </bufferGeometry>
-      <pointsMaterial size={0.065} vertexColors transparent opacity={fusionView ? 0.82 : 0.68} depthWrite={false} />
+      <pointsMaterial size={bevView ? 0.08 : 0.065} vertexColors transparent opacity={fusionView ? 0.82 : bevView ? 0.76 : 0.68} depthWrite={false} />
     </points>
   );
 }
 
-function RadarArcs({ fusionView }) {
+function RadarArcs({ fusionView, bevView }) {
   const groupRef = useRef();
   useFrame(({ clock }) => {
     if (groupRef.current) groupRef.current.position.z = Math.sin(clock.elapsedTime * 1.7) * 0.05;
@@ -647,7 +647,7 @@ function RadarArcs({ fusionView }) {
   return (
     <group ref={groupRef}>
       {[3.2, 5.2, 7.5, 10.2].map((radius, index) => (
-        <Arc key={radius} radius={radius} start={-0.45} end={0.45} color={SENSOR_COLORS.radar} opacity={fusionView ? 0.72 - index * 0.1 : 0.58 - index * 0.08} />
+        <Arc key={radius} radius={radius} start={-0.45} end={0.45} color={SENSOR_COLORS.radar} opacity={fusionView ? 0.72 - index * 0.1 : bevView ? 0.68 - index * 0.08 : 0.58 - index * 0.08} />
       ))}
       <SpeedVector from={[0.15, 0.32, -5.1]} to={[0.15, 0.32, -6.15]} />
       <SpeedVector from={[2.2, 0.32, -3.2]} to={[2.85, 0.32, -3.65]} />
@@ -681,7 +681,7 @@ function Arc({ radius, start, end, color, opacity }) {
   return <Line points={points} color={color} lineWidth={3} transparent opacity={opacity} />;
 }
 
-function UltrasonicBubbles({ fusionView }) {
+function UltrasonicBubbles({ fusionView, bevView }) {
   return (
     <group>
       {[
@@ -692,7 +692,7 @@ function UltrasonicBubbles({ fusionView }) {
       ].map((position, index) => (
         <mesh key={index} position={position} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[0.72, 1.42, 48]} />
-          <meshBasicMaterial color={SENSOR_COLORS.ultrasonic} transparent opacity={fusionView ? 0.55 : 0.42} side={THREE.DoubleSide} depthWrite={false} />
+          <meshBasicMaterial color={SENSOR_COLORS.ultrasonic} transparent opacity={fusionView ? 0.55 : bevView ? 0.52 : 0.42} side={THREE.DoubleSide} depthWrite={false} />
         </mesh>
       ))}
       <mesh position={[3.2, 0.08, -1.65]} rotation={[-Math.PI / 2, 0, 0]}>
