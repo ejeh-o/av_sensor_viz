@@ -12,75 +12,239 @@ const SENSOR_COLORS = {
 
 const laneMarkings = [-1.8, 1.8];
 
-export function AVScene({ activeSensors, fusionView, selectedObject }) {
+const SNOW_FLAKES = Array.from({ length: 64 }, (_, index) => {
+  const column = index % 8;
+  const row = Math.floor(index / 8);
+  return [
+    -6.9 + column * 1.95 + ((index * 17) % 9) * 0.035,
+    1.2 + ((index * 13) % 19) * 0.12,
+    -12.6 + row * 3.3 + ((index * 11) % 13) * 0.045,
+  ];
+});
+
+const SNOW_PATCHES = [
+  [-6.2, 0.038, -8.7, 2.1, 5.8],
+  [5.7, 0.038, -6.4, 2.4, 6.6],
+  [-5.8, 0.038, 3.8, 2.4, 5.4],
+  [5.9, 0.038, 4.8, 2.2, 4.6],
+  [-2.9, 0.039, -12.2, 1.2, 2.4],
+  [2.8, 0.039, -10.6, 1.1, 2.8],
+];
+
+const SNOW_MOUNDS = SNOW_PATCHES.flatMap(([x, y, z, width, depth], patchIndex) =>
+  Array.from({ length: 9 }, (_, moundIndex) => {
+    const column = moundIndex % 3;
+    const row = Math.floor(moundIndex / 3);
+    const jitterX = (((patchIndex + 1) * (moundIndex + 5)) % 7) * 0.035;
+    const jitterZ = (((patchIndex + 3) * (moundIndex + 2)) % 9) * 0.04;
+    const scaleX = width * (0.16 + ((patchIndex + moundIndex) % 4) * 0.025);
+    const scaleY = 0.035 + ((patchIndex * 3 + moundIndex) % 5) * 0.012;
+    const scaleZ = depth * (0.11 + ((patchIndex + moundIndex * 2) % 5) * 0.018);
+
+    return {
+      position: [
+        x - width * 0.32 + column * width * 0.32 + jitterX,
+        y + scaleY * 0.4,
+        z - depth * 0.28 + row * depth * 0.28 + jitterZ,
+      ],
+      scale: [scaleX, scaleY, scaleZ],
+    };
+  }),
+);
+
+const BASE_FUSION_LABELS = {
+  'Lead car': { confidence: '98%', risk: 'MED' },
+  'Adjacent car': { confidence: '93%', risk: 'LOW' },
+  Cyclist: { confidence: '91%', risk: 'MED' },
+  Pedestrian: { confidence: '94%', risk: 'HIGH' },
+  Cone: { confidence: '87%', risk: 'LOW' },
+};
+
+function getFusionLabel(label, fusionTracks) {
+  const matchingTrack = fusionTracks.find((track) => track.label === label || (label === 'Cone' && track.label === 'Traffic cone'));
+  if (!matchingTrack) return BASE_FUSION_LABELS[label];
+
+  const riskLabels = {
+    High: 'HIGH',
+    Medium: 'MED',
+    Low: 'LOW',
+  };
+  return {
+    confidence: matchingTrack.confidence,
+    risk: riskLabels[matchingTrack.risk] ?? BASE_FUSION_LABELS[label].risk,
+  };
+}
+
+export function AVScene({ activeSensors, fusionView, selectedObject, activeScenarios, fusionTracks, snowEnabled, bevView }) {
+  const nightModeEnabled = activeScenarios.includes('night-mode');
   return (
     <group>
-      <RoadEnvironment />
-      <EgoVehicle />
+      <RoadEnvironment activeScenarios={activeScenarios} nightModeEnabled={nightModeEnabled} snowEnabled={snowEnabled} />
+      <EgoVehicle nightModeEnabled={nightModeEnabled} />
       <SceneObjects selectedObject={selectedObject} activeSensors={activeSensors} />
       {fusionView ? (
-        <FusionPerceptionLayer />
+        <FusionPerceptionLayer fusionTracks={fusionTracks} />
       ) : (
         <>
           {activeSensors.lidar && <LidarObjectOutlines fusionView={fusionView} />}
-          <SensorLayers activeSensors={activeSensors} fusionView={fusionView} />
+          <SensorLayers activeSensors={activeSensors} fusionView={fusionView} bevView={bevView} />
         </>
       )}
     </group>
   );
 }
 
-function RoadEnvironment() {
+function RoadEnvironment({ activeScenarios, nightModeEnabled, snowEnabled }) {
   return (
     <group>
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.04, 0]}>
-        <planeGeometry args={[18, 28]} />
-        <meshStandardMaterial color="#d8ded6" roughness={0.86} />
+        <planeGeometry args={[20, 34]} />
+        <meshStandardMaterial color={nightModeEnabled ? '#263044' : snowEnabled ? '#d8e1e5' : '#d8ded6'} roughness={0.86} />
       </mesh>
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-        <planeGeometry args={[7.4, 25]} />
-        <meshStandardMaterial color="#30343b" roughness={0.82} />
+        <planeGeometry args={[7.4, 31]} />
+        <meshStandardMaterial color={nightModeEnabled ? '#171d29' : snowEnabled ? '#3a4148' : '#30343b'} roughness={0.82} />
       </mesh>
       {[-3.9, 3.9].map((x) => (
         <mesh key={x} receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[x, 0.015, 0]}>
-          <planeGeometry args={[0.16, 25]} />
-          <meshStandardMaterial color="#f5f7f2" roughness={0.7} />
+          <planeGeometry args={[0.16, 31]} />
+          <meshStandardMaterial color={nightModeEnabled ? '#bac7d8' : '#f5f7f2'} roughness={0.7} emissive={nightModeEnabled ? '#1d3557' : '#000000'} emissiveIntensity={nightModeEnabled ? 0.08 : 0} />
         </mesh>
       ))}
       {laneMarkings.map((x) =>
-        Array.from({ length: 7 }, (_, index) => (
-          <mesh key={`${x}-${index}`} rotation={[-Math.PI / 2, 0, 0]} position={[x, 0.025, -10 + index * 3.7]}>
+        Array.from({ length: 9 }, (_, index) => (
+          <mesh key={`${x}-${index}`} rotation={[-Math.PI / 2, 0, 0]} position={[x, 0.025, -13.4 + index * 3.55]}>
             <planeGeometry args={[0.08, 1.55]} />
-            <meshStandardMaterial color="#f8fafc" roughness={0.45} />
+            <meshStandardMaterial color={nightModeEnabled ? '#d3dbe8' : '#f8fafc'} roughness={0.45} emissive={nightModeEnabled ? '#1d3557' : '#000000'} emissiveIntensity={nightModeEnabled ? 0.08 : 0} />
           </mesh>
         )),
       )}
-      <Crosswalk />
-      <SidewalkDetails />
+      <Crosswalk nightModeEnabled={nightModeEnabled} snowEnabled={snowEnabled} />
+      {activeScenarios.includes('highway-underpass') && <HighwayUnderpass nightModeEnabled={nightModeEnabled} />}
+      <SidewalkDetails nightModeEnabled={nightModeEnabled} />
+      {nightModeEnabled && <NightLighting />}
+      {snowEnabled && <StaticSnow nightModeEnabled={nightModeEnabled} />}
     </group>
   );
 }
 
-function Crosswalk() {
+function Crosswalk({ nightModeEnabled, snowEnabled }) {
   return (
     <group position={[0, 0.035, -6.7]}>
       {Array.from({ length: 8 }, (_, index) => (
         <mesh key={index} rotation={[-Math.PI / 2, 0, 0]} position={[-3.05 + index * 0.88, 0, 0]}>
           <planeGeometry args={[0.42, 2]} />
-          <meshStandardMaterial color="#edf2f7" roughness={0.5} />
+          <meshStandardMaterial color={nightModeEnabled ? '#cbd5e1' : snowEnabled ? '#e5edf2' : '#edf2f7'} roughness={0.5} emissive={nightModeEnabled ? '#1d3557' : '#000000'} emissiveIntensity={nightModeEnabled ? 0.06 : 0} />
         </mesh>
       ))}
     </group>
   );
 }
 
-function SidewalkDetails() {
+function SidewalkDetails({ nightModeEnabled }) {
   return (
     <group>
       <ParkedVehicle position={[-5.2, 0.26, 4.1]} />
       <TrafficCone position={[4.7, 0.05, -1.5]} />
       <TrafficSign position={[4.9, 0, -7.8]} />
-      <TrafficLight position={[-4.6, 0, -7.2]} />
+      <TrafficLight position={[-4.6, 0, -7.2]} nightModeEnabled={nightModeEnabled} />
+    </group>
+  );
+}
+
+function HighwayUnderpass({ nightModeEnabled }) {
+  return (
+    <group position={[0, 0, -11.25]}>
+      <mesh receiveShadow position={[0, 2.55, 0]}>
+        <boxGeometry args={[11.6, 0.42, 3.8]} />
+        <meshStandardMaterial color="#7f8b94" roughness={0.76} metalness={0.04} />
+      </mesh>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, Math.PI / 2]} position={[0, 2.785, 0]}>
+        <planeGeometry args={[3.08, 11.05]} />
+        <meshStandardMaterial color="#2f343b" roughness={0.82} />
+      </mesh>
+      {[-5.75, 5.75].map((x) => (
+        <mesh key={`guard-${x}`} castShadow position={[x, 3.03, 0]}>
+          <boxGeometry args={[0.18, 0.5, 3.95]} />
+          <meshStandardMaterial color="#c7cdd1" roughness={0.55} />
+        </mesh>
+      ))}
+      {[-1.15, 1.15].map((z) =>
+        Array.from({ length: 8 }, (_, index) => (
+          <mesh
+            key={`top-lane-${z}-${index}`}
+            rotation={[-Math.PI / 2, 0, Math.PI / 2]}
+            position={[-4.5 + index * 1.28, 2.805, z]}
+          >
+            <planeGeometry args={[0.08, 0.72]} />
+            <meshStandardMaterial color="#f8fafc" roughness={0.48} />
+          </mesh>
+        )),
+      )}
+      <mesh rotation={[-Math.PI / 2, 0, Math.PI / 2]} position={[2.9, 2.81, 0]}>
+        <planeGeometry args={[0.12, 1.1]} />
+        <meshStandardMaterial color="#f8fafc" roughness={0.45} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, -Math.PI / 2]} position={[3.52, 2.81, 0]}>
+        <coneGeometry args={[0.32, 0.58, 3]} />
+        <meshStandardMaterial color="#f8fafc" roughness={0.45} />
+      </mesh>
+      {[-4.65, 4.65].map((x) =>
+        [-1.38, 1.38].map((z) => (
+          <mesh key={`pier-${x}-${z}`} castShadow receiveShadow position={[x, 1.25, z]}>
+            <boxGeometry args={[0.58, 2.5, 0.58]} />
+            <meshStandardMaterial color="#9ba5aa" roughness={0.82} />
+          </mesh>
+        )),
+      )}
+      {[-2.1, 2.1].map((x) => (
+        <mesh key={`shadow-${x}`} rotation={[-Math.PI / 2, 0, 0]} position={[x, 0.035, 0]}>
+          <planeGeometry args={[1.7, 3.7]} />
+          <meshBasicMaterial color="#101827" transparent opacity={nightModeEnabled ? 0.28 : 0.18} depthWrite={false} />
+        </mesh>
+      ))}
+      <Html position={[0, 3.24, -1.95]} center distanceFactor={12}>
+        <div className="scenario-label">Highway underpass</div>
+      </Html>
+    </group>
+  );
+}
+
+function NightLighting() {
+  return (
+    <group>
+      <hemisphereLight args={['#7dd3fc', '#0f172a', 0.18]} />
+      <pointLight position={[-4.55, 3.1, -7.2]} intensity={1.45} distance={7.5} color="#fef3c7" />
+      <pointLight position={[4.6, 3.4, -1.5]} intensity={0.62} distance={6.5} color="#bfdbfe" />
+      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0.041, -3.35]}>
+        <coneGeometry args={[3.35, 8.6, 48, 1, true]} />
+        <meshBasicMaterial color="#fef3c7" transparent opacity={0.13} side={THREE.DoubleSide} depthWrite={false} />
+      </mesh>
+      <Html position={[3.7, 2.9, -1.85]} center distanceFactor={13}>
+        <div className="scenario-label night">Night mode</div>
+      </Html>
+    </group>
+  );
+}
+
+function StaticSnow({ nightModeEnabled }) {
+  return (
+    <group>
+      {SNOW_MOUNDS.map(({ position, scale }, index) => (
+        <mesh key={`snow-mound-${index}`} position={position} scale={scale} castShadow={false} receiveShadow>
+          <sphereGeometry args={[1, 16, 8]} />
+          <meshStandardMaterial color={nightModeEnabled ? '#cbd5e1' : '#f1f7fb'} roughness={0.96} transparent opacity={nightModeEnabled ? 0.78 : 0.93} />
+        </mesh>
+      ))}
+      {SNOW_FLAKES.map((position, index) => (
+        <mesh key={`snow-flake-${index}`} position={position}>
+          <sphereGeometry args={[0.035 + (index % 3) * 0.008, 8, 6]} />
+          <meshBasicMaterial color={nightModeEnabled ? '#dbeafe' : '#ffffff'} transparent opacity={nightModeEnabled ? 0.58 : 0.78} />
+        </mesh>
+      ))}
+      <Html position={[-4.6, 2.6, 2.2]} center distanceFactor={13}>
+        <div className="scenario-label snow">Snow</div>
+      </Html>
     </group>
   );
 }
@@ -101,7 +265,7 @@ function ParkedVehicle({ position }) {
   );
 }
 
-function EgoVehicle() {
+function EgoVehicle({ nightModeEnabled }) {
   return (
     <group position={[0, 0.24, 2.7]}>
       <mesh castShadow receiveShadow>
@@ -116,6 +280,19 @@ function EgoVehicle() {
         <boxGeometry args={[0.72, 0.08, 0.7]} />
         <meshStandardMaterial color="#111827" emissive="#0ea5e9" emissiveIntensity={0.18} />
       </mesh>
+      {nightModeEnabled && (
+        <>
+          {[-0.42, 0.42].map((x) => (
+            <pointLight key={x} position={[x, 0.28, -1.42]} intensity={0.45} distance={5.5} color="#fff7d6" />
+          ))}
+          {[-0.42, 0.42].map((x) => (
+            <mesh key={`lamp-${x}`} position={[x, 0.04, -1.35]}>
+              <sphereGeometry args={[0.08, 16, 10]} />
+              <meshStandardMaterial color="#fef3c7" emissive="#fef3c7" emissiveIntensity={1.4} />
+            </mesh>
+          ))}
+        </>
+      )}
       <VehicleWheels width={1.55} length={2.65} y={-0.02} />
       <Text position={[0, 0.88, 0]} rotation={[-0.9, 0, 0]} fontSize={0.18} color="#0f172a" anchorX="center">
         EGO AV
@@ -252,7 +429,7 @@ function TrafficSign({ position }) {
   );
 }
 
-function TrafficLight({ position }) {
+function TrafficLight({ position, nightModeEnabled }) {
   return (
     <group position={position}>
       <mesh castShadow position={[0, 1.1, 0]}>
@@ -264,9 +441,9 @@ function TrafficLight({ position }) {
         <meshStandardMaterial color="#111827" />
       </mesh>
       {['#ef4444', '#f59e0b', '#22c55e'].map((color, index) => (
-        <mesh key={color} position={[0.26, 2.42 - index * 0.24, -0.12]}>
+        <mesh key={color} position={[0.26, 2.42 - index * 0.24, 0.12]}>
           <sphereGeometry args={[0.065, 16, 12]} />
-          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={index === 2 ? 0.75 : 0.2} />
+          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={nightModeEnabled ? (index === 2 ? 1.55 : 0.35) : (index === 2 ? 0.75 : 0.2)} />
         </mesh>
       ))}
     </group>
@@ -281,21 +458,21 @@ function ObjectLabel({ label, position }) {
   );
 }
 
-function SensorLayers({ activeSensors, fusionView }) {
+function SensorLayers({ activeSensors, fusionView, bevView }) {
   return (
     <group position={[0, 0.06, 2.7]}>
-      {activeSensors.camera && <CameraFrustum fusionView={fusionView} />}
-      {activeSensors.lidar && <LidarCloud fusionView={fusionView} />}
-      {activeSensors.radar && <RadarArcs fusionView={fusionView} />}
-      {activeSensors.ultrasonic && <UltrasonicBubbles fusionView={fusionView} />}
+      {activeSensors.camera && <CameraFrustum fusionView={fusionView} bevView={bevView} />}
+      {activeSensors.lidar && <LidarCloud fusionView={fusionView} bevView={bevView} />}
+      {activeSensors.radar && <RadarArcs fusionView={fusionView} bevView={bevView} />}
+      {activeSensors.ultrasonic && <UltrasonicBubbles fusionView={fusionView} bevView={bevView} />}
     </group>
   );
 }
 
-function CameraFrustum({ fusionView }) {
+function CameraFrustum({ fusionView, bevView }) {
   const materialRef = useRef();
   useFrame(({ clock }) => {
-    if (materialRef.current) materialRef.current.opacity = fusionView ? 0.23 + Math.sin(clock.elapsedTime * 2.5) * 0.04 : 0.2;
+    if (materialRef.current) materialRef.current.opacity = fusionView ? 0.23 + Math.sin(clock.elapsedTime * 2.5) * 0.04 : bevView ? 0.28 : 0.2;
   });
   return (
     <group>
@@ -334,47 +511,53 @@ function LidarBox({ position, scale, opacity }) {
   );
 }
 
-function FusionPerceptionLayer() {
+function FusionPerceptionLayer({ fusionTracks }) {
+  const leadCar = getFusionLabel('Lead car', fusionTracks);
+  const adjacentCar = getFusionLabel('Adjacent car', fusionTracks);
+  const cyclist = getFusionLabel('Cyclist', fusionTracks);
+  const pedestrian = getFusionLabel('Pedestrian', fusionTracks);
+  const cone = getFusionLabel('Cone', fusionTracks);
+
   return (
     <group>
       <FusionTrack
         position={[0.15, 0.6, -5.1]}
         scale={[1.9, 1.05, 2.65]}
         label="Lead car"
-        confidence="98%"
-        risk="MED"
+        confidence={leadCar.confidence}
+        risk={leadCar.risk}
         color="#0ea5e9"
       />
       <FusionTrack
         position={[-2.1, 0.6, -1.9]}
         scale={[1.85, 1.0, 2.55]}
         label="Adjacent car"
-        confidence="93%"
-        risk="LOW"
+        confidence={adjacentCar.confidence}
+        risk={adjacentCar.risk}
         color="#14b8a6"
       />
       <FusionTrack
         position={[2.2, 0.78, -3.2]}
         scale={[0.95, 1.5, 1.55]}
         label="Cyclist"
-        confidence="91%"
-        risk="MED"
+        confidence={cyclist.confidence}
+        risk={cyclist.risk}
         color="#f59e0b"
       />
       <FusionTrack
         position={[3.15, 0.85, -6.65]}
         scale={[0.72, 1.65, 0.72]}
         label="Pedestrian"
-        confidence="94%"
-        risk="HIGH"
+        confidence={pedestrian.confidence}
+        risk={pedestrian.risk}
         color="#ef4444"
       />
       <FusionTrack
         position={[3.2, 0.42, 1.05]}
         scale={[0.9, 0.86, 0.9]}
         label="Cone"
-        confidence="87%"
-        risk="LOW"
+        confidence={cone.confidence}
+        risk={cone.risk}
         color="#a855f7"
       />
       <Line
@@ -420,7 +603,7 @@ function FusionTrack({ position, scale, label, confidence, risk, color }) {
   );
 }
 
-function LidarCloud({ fusionView }) {
+function LidarCloud({ fusionView, bevView }) {
   const pointsRef = useRef();
   const { positions, colors } = useMemo(() => {
     const count = 900;
@@ -451,12 +634,12 @@ function LidarCloud({ fusionView }) {
         <bufferAttribute attach="attributes-position" count={positions.length / 3} array={positions} itemSize={3} />
         <bufferAttribute attach="attributes-color" count={colors.length / 3} array={colors} itemSize={3} />
       </bufferGeometry>
-      <pointsMaterial size={0.065} vertexColors transparent opacity={fusionView ? 0.82 : 0.68} depthWrite={false} />
+      <pointsMaterial size={bevView ? 0.08 : 0.065} vertexColors transparent opacity={fusionView ? 0.82 : bevView ? 0.76 : 0.68} depthWrite={false} />
     </points>
   );
 }
 
-function RadarArcs({ fusionView }) {
+function RadarArcs({ fusionView, bevView }) {
   const groupRef = useRef();
   useFrame(({ clock }) => {
     if (groupRef.current) groupRef.current.position.z = Math.sin(clock.elapsedTime * 1.7) * 0.05;
@@ -464,7 +647,7 @@ function RadarArcs({ fusionView }) {
   return (
     <group ref={groupRef}>
       {[3.2, 5.2, 7.5, 10.2].map((radius, index) => (
-        <Arc key={radius} radius={radius} start={-0.45} end={0.45} color={SENSOR_COLORS.radar} opacity={fusionView ? 0.72 - index * 0.1 : 0.58 - index * 0.08} />
+        <Arc key={radius} radius={radius} start={-0.45} end={0.45} color={SENSOR_COLORS.radar} opacity={fusionView ? 0.72 - index * 0.1 : bevView ? 0.68 - index * 0.08 : 0.58 - index * 0.08} />
       ))}
       <SpeedVector from={[0.15, 0.32, -5.1]} to={[0.15, 0.32, -6.15]} />
       <SpeedVector from={[2.2, 0.32, -3.2]} to={[2.85, 0.32, -3.65]} />
@@ -498,7 +681,7 @@ function Arc({ radius, start, end, color, opacity }) {
   return <Line points={points} color={color} lineWidth={3} transparent opacity={opacity} />;
 }
 
-function UltrasonicBubbles({ fusionView }) {
+function UltrasonicBubbles({ fusionView, bevView }) {
   return (
     <group>
       {[
@@ -509,7 +692,7 @@ function UltrasonicBubbles({ fusionView }) {
       ].map((position, index) => (
         <mesh key={index} position={position} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[0.72, 1.42, 48]} />
-          <meshBasicMaterial color={SENSOR_COLORS.ultrasonic} transparent opacity={fusionView ? 0.55 : 0.42} side={THREE.DoubleSide} depthWrite={false} />
+          <meshBasicMaterial color={SENSOR_COLORS.ultrasonic} transparent opacity={fusionView ? 0.55 : bevView ? 0.52 : 0.42} side={THREE.DoubleSide} depthWrite={false} />
         </mesh>
       ))}
       <mesh position={[3.2, 0.08, -1.65]} rotation={[-Math.PI / 2, 0, 0]}>

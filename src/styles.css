@@ -36,6 +36,26 @@ button {
   background-size: 32px 32px;
 }
 
+.app-shell.panel-collapsed {
+  grid-template-columns: minmax(0, 1fr) 58px;
+}
+
+.app-shell.night-mode {
+  background:
+    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+    #0f172a;
+  background-size: 32px 32px;
+}
+
+.app-shell.snow-mode:not(.night-mode) {
+  background:
+    linear-gradient(90deg, rgba(71, 85, 105, 0.05) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(71, 85, 105, 0.05) 1px, transparent 1px),
+    #e3ebef;
+  background-size: 32px 32px;
+}
+
 .scene-region {
   position: relative;
   min-width: 0;
@@ -75,6 +95,11 @@ h1 {
   line-height: 0.94;
   letter-spacing: 0;
   max-width: 620px;
+}
+
+.night-mode h1 {
+  color: #f8fafc;
+  text-shadow: 0 10px 28px rgba(0, 0, 0, 0.32);
 }
 
 .view-actions {
@@ -117,6 +142,17 @@ h1 {
 .view-actions button.active {
   background: #172033;
   color: #ffffff;
+}
+
+.night-mode .view-actions button {
+  border-color: rgba(203, 213, 225, 0.24);
+  background: rgba(15, 23, 42, 0.74);
+  color: #f8fafc;
+}
+
+.night-mode .view-actions button.active {
+  background: #f8fafc;
+  color: #172033;
 }
 
 .empty-state-banner {
@@ -188,6 +224,12 @@ h1 {
   backdrop-filter: blur(12px);
 }
 
+.night-mode .scene-legend span {
+  border: 1px solid rgba(203, 213, 225, 0.2);
+  background: rgba(15, 23, 42, 0.82);
+  color: #f8fafc;
+}
+
 .scene-legend span::before {
   width: 9px;
   height: 9px;
@@ -206,12 +248,87 @@ h1 {
 }
 
 .control-panel {
+  position: relative;
   overflow-y: auto;
   max-height: 100vh;
   padding: 22px;
   border-left: 1px solid rgba(23, 32, 51, 0.1);
   background: rgba(248, 250, 252, 0.92);
   backdrop-filter: blur(16px);
+}
+
+.panel-collapsed .control-panel {
+  overflow: hidden;
+  padding: 12px 8px;
+}
+
+.panel-collapse-button {
+  position: sticky;
+  z-index: 6;
+  top: 0;
+  left: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin: 0 0 14px auto;
+  border: 1px solid rgba(23, 32, 51, 0.12);
+  border-radius: 8px;
+  background: #ffffff;
+  color: #172033;
+  box-shadow: 0 10px 24px rgba(23, 32, 51, 0.08);
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.panel-collapse-button:hover {
+  transform: translateY(-1px);
+  background: #172033;
+  color: #ffffff;
+}
+
+.panel-collapsed .panel-collapse-button {
+  margin: 0 auto;
+}
+
+.panel-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 14px;
+  padding: 4px;
+  border: 1px solid rgba(23, 32, 51, 0.1);
+  border-radius: 8px;
+  background: rgba(226, 232, 240, 0.54);
+}
+
+.panel-tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: 6px;
+  background: transparent;
+  color: #475569;
+  font-size: 0.78rem;
+  font-weight: 840;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.panel-tabs button.active {
+  background: #ffffff;
+  color: #172033;
+  box-shadow: 0 8px 18px rgba(23, 32, 51, 0.08);
 }
 
 .panel-section {
@@ -412,6 +529,32 @@ h1 {
 .fusion-track-list {
   display: grid;
   gap: 10px;
+}
+
+.fusion-scenario-card {
+  padding: 12px;
+  border: 1px solid rgba(14, 165, 233, 0.18);
+  border-radius: 8px;
+  background: #eff6ff;
+  box-shadow: inset 4px 0 0 #0ea5e9;
+}
+
+.fusion-scenario-card strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #0f172a;
+  font-size: 0.86rem;
+}
+
+.fusion-scenario-card p {
+  margin: 0;
+  color: #334155;
+  font-size: 0.8rem;
+  line-height: 1.38;
+}
+
+.fusion-scenario-card p + p {
+  margin-top: 6px;
 }
 
 .fusion-track {
@@ -657,10 +800,201 @@ h1 {
   line-height: 1.35;
 }
 
+.scenario-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.scenario-card {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 11px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid rgba(23, 32, 51, 0.1);
+  border-radius: 8px;
+  background: #ffffff;
+  color: #172033;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.scenario-card:hover {
+  transform: translateY(-1px);
+}
+
+.scenario-card.selected {
+  border-color: #172033;
+  background: #f8fafc;
+  box-shadow: inset 4px 0 0 #172033;
+}
+
+.scenario-card.selected .scenario-icon {
+  background: #172033;
+  color: #ffffff;
+}
+
+.scenario-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: #eef2f7;
+  color: #172033;
+}
+
+.scenario-copy {
+  min-width: 0;
+}
+
+.scenario-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.scenario-copy strong,
+.scenario-copy small {
+  display: block;
+}
+
+.scenario-copy strong {
+  font-size: 0.92rem;
+}
+
+.scenario-card-head em {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: #64748b;
+  font-size: 0.66rem;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.scenario-card.selected .scenario-card-head em {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.scenario-copy small {
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 0.73rem;
+  font-weight: 780;
+}
+
+.scenario-copy p,
+.scenario-detail p {
+  margin: 8px 0 10px;
+  color: #334155;
+  font-size: 0.82rem;
+  line-height: 1.38;
+}
+
+.scenario-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.scenario-tags em {
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: #475569;
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.scenario-card.selected .scenario-tags em {
+  background: #e2e8f0;
+  color: #172033;
+}
+
+.scenario-detail {
+  padding: 14px;
+  border: 1px solid rgba(23, 32, 51, 0.1);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.scenario-detail.enabled {
+  box-shadow: inset 4px 0 0 #172033;
+}
+
+.scenario-detail strong {
+  display: block;
+  color: #0f172a;
+  font-size: 1rem;
+}
+
+.impact-list {
+  display: grid;
+  gap: 10px;
+}
+
+.impact-list article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 10px;
+  padding: 12px;
+  border: 1px solid rgba(23, 32, 51, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 4px 0 0 color-mix(in srgb, var(--sensor-color) 42%, #cbd5e1);
+  opacity: 0.72;
+}
+
+.impact-list article.active {
+  background: #ffffff;
+  opacity: 1;
+}
+
+.impact-list strong {
+  color: var(--sensor-color);
+  font-size: 0.86rem;
+}
+
+.impact-list em {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sensor-color) 13%, #ffffff);
+  color: #334155;
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.impact-list p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #334155;
+  font-size: 0.8rem;
+  line-height: 1.38;
+}
+
+.impact-list p + p {
+  margin-top: 5px;
+}
+
 .object-label,
 .detection-tag,
 .velocity-tag,
-.fusion-tag {
+.fusion-tag,
+.scenario-label {
   white-space: nowrap;
   border-radius: 999px;
   color: #0f172a;
@@ -728,12 +1062,35 @@ h1 {
   color: #166534;
 }
 
+.scenario-label {
+  padding: 5px 9px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 22px rgba(23, 32, 51, 0.16);
+  font-size: 11px;
+}
+
+.scenario-label.night {
+  border: 1px solid rgba(191, 219, 254, 0.55);
+  background: rgba(15, 23, 42, 0.88);
+  color: #dbeafe;
+}
+
+.scenario-label.snow {
+  border: 1px solid rgba(148, 163, 184, 0.36);
+  background: rgba(248, 250, 252, 0.94);
+  color: #334155;
+}
+
 @media (max-width: 960px) {
   body {
     overflow: auto;
   }
 
   .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .app-shell.panel-collapsed {
     grid-template-columns: 1fr;
   }
 
@@ -745,6 +1102,15 @@ h1 {
     max-height: none;
     border-top: 1px solid rgba(23, 32, 51, 0.1);
     border-left: 0;
+  }
+
+  .panel-collapsed .control-panel {
+    min-height: 58px;
+    padding: 12px 16px;
+  }
+
+  .panel-collapse-button {
+    position: relative;
   }
 
   .scene-topbar {
